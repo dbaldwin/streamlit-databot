@@ -298,4 +298,4 @@ cython_debug/
 /requirements.txt
 
 .idea
-./data/test_data.txt
+/data/test_data.txt

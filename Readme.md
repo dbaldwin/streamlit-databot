@@ -1,5 +1,7 @@
 # DroneBlocks databot2.0 Streamlit Dashboard
 
+![overview](./docs/overview.gif)
+
 ## Setup
 
 ```text
