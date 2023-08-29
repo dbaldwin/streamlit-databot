@@ -1,3 +1,5 @@
+import platform
+
 import streamlit as st
 from databot.PyDatabot import PyDatabot, DefaultDatabotConfig, DatabotConfig
 import dataclasses
@@ -232,7 +234,12 @@ def collect_data_on_click():
         databot_config: DatabotConfig = create_databot_config()
         with open("streamlit_databot_config.pkl", "wb") as f:
             pickle.dump(databot_config, f)
-        st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"], cwd=Path(".").absolute())
+        # windows needs shell=True, macos shell=False
+        if "windows" in platform.system().lower():
+            shell_flag = True
+        else:
+            shell_flag = False
+        st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"], cwd=Path(".").absolute(), shell=shell_flag)
 
 
 def stop_collecting_data_on_click():
