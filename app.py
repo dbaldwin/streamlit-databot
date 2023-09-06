@@ -1,5 +1,5 @@
 import platform
-
+from typing import Tuple
 import streamlit as st
 from databot.PyDatabot import PyDatabot, DefaultDatabotConfig, DatabotConfig
 import dataclasses
@@ -11,6 +11,7 @@ from pathlib import Path
 import pickle
 import time
 import altair as alt
+from hotspots.databot_image_map import find_image_map_entry
 
 st.set_page_config(
     page_title="Databot Dashboard",
@@ -145,12 +146,13 @@ databot_sensors = {
     'gesture': {
         'friendly_name': 'Gesture',
         'save': False,
-        'display': False
+        'display': False,
+        'data_columns': ['gesture']
     },
 
 }
 
-def read_databot_data_file() -> pd.DataFrame:
+def read_databot_data_file() -> pd.DataFrame | None:
     try:
         df = pd.read_json(path_or_buf="./data/test_data.txt", lines=True)
         df.sort_values(by=['time'], ascending=False, inplace=True)
@@ -184,46 +186,98 @@ def read_image(image_path: str):
     # _image = imutils.resize(_image, width, height)
     return im_rgb
 
-# def _databot_sensor_file_on_change(*args, **kwargs):
-#     print(args)
-#     key = args[0].split("_")[0]
-#     databot_sensors[key]['save'] = st.session_state[args[0]]
-#
-# def _databot_sensor_display_on_change(*args, **kwargs):
-#     print(args)
-#     key = args[0].split("_")[0]
-#     databot_sensors[key]['display'] = st.session_state[args[0]]
-
 def setup_input_selection_sidebar():
     with st.sidebar:
-        st.header("Databot Sensors")
-        fields = dataclasses.fields(DefaultDatabotConfig)
-        field_names = []
-        for field in fields:
-            field_names.append(field.name)
-        # field_names = sorted(field_names)
+        tab1, tab2, tab3 = st.tabs(['Databot Sensors', 'Collection Config', 'Data File Config'])
+        with tab1:
+            st.header("Databot Sensors")
+            fields = dataclasses.fields(DefaultDatabotConfig)
+            field_names = []
+            for field in fields:
+                field_names.append(field.name)
+            # field_names = sorted(field_names)
 
-        for field_name in field_names:
-            if field_name in databot_sensors:
-                databot_sensor = databot_sensors[field_name]
-                col1, col2, col3 = st.columns(3)
+            for field_name in field_names:
+                if field_name in databot_sensors:
+                    databot_sensor = databot_sensors[field_name]
+                    col1, col2, col3 = st.columns(3)
 
-                with col1:
-                    st.write(databot_sensor['friendly_name'])
-                with col2:
-                    st.checkbox("SaveToFile", value=databot_sensor['save'],  key=f"{field_name}_save_cb")
-                with col3:
-                    st.checkbox("Display", value=databot_sensor['display'], key=f"{field_name}_display_cb")
+                    with col1:
+                        st.write(databot_sensor['friendly_name'])
+                    with col2:
+                        st.checkbox("SaveToFile", value=databot_sensor['save'],  key=f"{field_name}_save_cb")
+                    with col3:
+                        st.checkbox("Display", value=databot_sensor['display'], key=f"{field_name}_display_cb")
+        with tab2:
+            st.header("Databot Refresh Rate in milliseconds")
+            cols = st.columns(2)
+            with cols[0]:
+                pass
+
+            with cols[1]:
+                st.number_input(label="Refresh rate in ms", min_value=100, max_value=1000, value=1000, step=100,
+                                key="databot_data_refresh_rate")
+            st.divider()
 
 
-def create_databot_config() -> DatabotConfig:
-    databot_config = DatabotConfig()
+            st.header("Display the last 'n' number of data samples.")
+            col4, col5 = st.columns(2)
+            with col4:
+                st.write("Set to zero for all data values")
+
+            with col5:
+                st.number_input(label="Number of samples to display", min_value=0, max_value=300, value=0, step=1,
+                                key="number_of_samples_to_display")
+
+            st.divider()
+            st.header("Total number of samples to collect")
+            col6, col7 = st.columns(2)
+            with col6:
+                st.write("Set to zero for unlimited datapoints")
+            with col7:
+                st.number_input(label="Number of samples to collect", min_value=0, max_value=5000, value=0, step=1,
+                                key="number_of_samples_to_collect")
+
+        with tab3:
+            st.header("Data file configuration")
+            st.text("Use this configuration if you want to read a Databot json")
+            st.text("data file that is being created by another process")
+            st.divider()
+            st.file_uploader(label='JSON Data File', type=['json', 'txt'], accept_multiple_files=False, key="json_data_file_path")
+
+def get_checked_save_to_file() -> list[Tuple[str,str]]:
+    checked = []
     fields = dataclasses.fields(DefaultDatabotConfig)
     for field in fields:
         checkbox_key = f"{field.name}_save_cb"
         if checkbox_key in list(st.session_state.keys()):
-            if st.session_state[checkbox_key]:
-                setattr(databot_config, field.name, True)
+            if st.session_state[checkbox_key]: # if the checkbox is True in the session state return it
+                checked.append((checkbox_key, checkbox_key.split("_")[0]))
+    return checked
+
+def get_checked_display_chart() -> list[Tuple[str,str]]:
+    checked = []
+    fields = dataclasses.fields(DefaultDatabotConfig)
+    for field in fields:
+        checkbox_key = f"{field.name}_display _cb"
+        if checkbox_key in list(st.session_state.keys()):
+            if st.session_state[checkbox_key]: # if the checkbox is True in the session state return it
+                checked.append((checkbox_key, checkbox_key.split("_")[0]))
+    return checked
+
+def create_databot_config() -> DatabotConfig:
+    databot_config = DatabotConfig()
+    checked_save = get_checked_save_to_file()
+    for checkbox_key, sensor_name in checked_save:
+        setattr(databot_config, sensor_name, True)
+    databot_config.refresh = st.session_state['databot_data_refresh_rate']
+
+    # fields = dataclasses.fields(DefaultDatabotConfig)
+    # for field in fields:
+    #     checkbox_key = f"{field.name}_save_cb"
+    #     if checkbox_key in list(st.session_state.keys()):
+    #         if st.session_state[checkbox_key]:
+    #             setattr(databot_config, field.name, True)
     return databot_config
 
 def collect_data_on_click():
@@ -270,6 +324,7 @@ def draw_dashboard(placeholder_component, refresh_rate: int = 1):
                     if st.session_state[checkbox_key]:
                         data_columns = databot_sensors[field.name]['data_columns']
                         if len(data_columns) == 1:
+                            # then there is only a single metric for this sensor
                             number_of_samples_to_display = st.session_state['number_of_samples_to_display']
                             if number_of_samples_to_display > 0:
                                 df = df.head(number_of_samples_to_display)
@@ -310,6 +365,15 @@ def draw_dashboard(placeholder_component, refresh_rate: int = 1):
     if refresh_rate > 0:
         time.sleep(refresh_rate)
 
+def highlight_selected_sensor(db_image):
+    fields = dataclasses.fields(DefaultDatabotConfig)
+    for field in fields:
+        checkbox_key = f"{field.name}_save_cb"
+        if checkbox_key in list(st.session_state.keys()):
+            if st.session_state[checkbox_key] == True:
+                print(f"Key: {checkbox_key}: {st.session_state[checkbox_key]}")
+                key, value = find_image_map_entry(checkbox_key.split("_")[0])
+                print(key, value)
 
 def main():
     st.header("DroneBlocks databot2.0 Dashboard")
@@ -320,29 +384,11 @@ def main():
         col1, col2, col3 = st.columns(3)
         st.divider()
         with col1:
-            st.button("Collect Data", key='collect_data', on_click=collect_data_on_click)
+            st.button("Start Reading Data", key='collect_data', on_click=collect_data_on_click)
         with col2:
-            st.button("Stop Collecting data", key="stop_collect_data", on_click=stop_collecting_data_on_click)
+            st.button("Stop Reading Data", key="stop_collect_data", on_click=stop_collecting_data_on_click)
         with col3:
-            st.checkbox(label="Data refresh", value=False, key="data_refresh")
-
-
-        col4, col5 = st.columns(2)
-        with col4:
-            st.write("Display the last 'n' number of data samples.")
-            st.write("Set to zero for all data values")
-        with col5:
-            st.number_input(label="Number of samples to display", min_value=0, max_value=300, value=0, step=1, key="number_of_samples_to_display")
-
-        st.divider()
-        col6, col7 = st.columns(2)
-        with col6:
-            st.write("Total number of samples to collect")
-            st.write("Set to zero to not limit the number of datapoints")
-        with col7:
-            st.number_input(label="Number of samples to collect", min_value=0, max_value=5000, value=0, step=1, key="number_of_samples_to_collect")
-
-        st.divider()
+            st.checkbox(label="Refresh Charts", value=False, key="data_refresh")
 
         placeholder = st.empty()
 
@@ -362,6 +408,8 @@ def main():
         st.write(hotspots_df.shape)
         the_image = read_image("./hotspots/databot.png")
         # st.image(image=the_image)
+
+        # highlight_selected_sensor(the_image)
 
         value = streamlit_image_coordinates(source=the_image, height=650, width=650, key="db_image")
         #

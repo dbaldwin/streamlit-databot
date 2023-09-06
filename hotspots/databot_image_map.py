@@ -1,3 +1,4 @@
+from typing import Tuple
 
 databot_image_map = {
     1: {
@@ -14,3 +15,11 @@ databot_image_map = {
 
     }
 }
+
+
+def find_image_map_entry(sensor_name: str) -> Tuple[int,dict] :
+    for key, value in databot_image_map.items():
+        if value['sensor_name'] == sensor_name:
+            return key, value
+    else:
+        return -1, {}
