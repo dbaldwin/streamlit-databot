@@ -1,16 +1,18 @@
-import platform
-from typing import Tuple
-import streamlit as st
-from databot.PyDatabot import PyDatabot, DefaultDatabotConfig, DatabotConfig
 import dataclasses
-import cv2
-from streamlit_image_coordinates import streamlit_image_coordinates
-import pandas as pd
-import subprocess
-from pathlib import Path
 import pickle
+import platform
+import subprocess
 import time
+from pathlib import Path
+from typing import Tuple
+
 import altair as alt
+import cv2
+import pandas as pd
+import streamlit as st
+from databot.PyDatabot import DefaultDatabotConfig, DatabotConfig
+from streamlit_image_coordinates import streamlit_image_coordinates
+
 from hotspots.databot_image_map import find_image_map_entry
 
 st.set_page_config(
@@ -43,7 +45,8 @@ databot_sensors = {
         'friendly_name': 'Linear Acceleration',
         'save': False,
         'display': False,
-        'data_columns': ['linear_acceleration_x', 'linear_acceleration_y', 'linear_acceleration_z', 'absolute_linear_acceleration']
+        'data_columns': ['linear_acceleration_x', 'linear_acceleration_y', 'linear_acceleration_z',
+                         'absolute_linear_acceleration']
     },
     'gyro': {
         'friendly_name': 'Gyroscope',
@@ -152,13 +155,26 @@ databot_sensors = {
 
 }
 
-def read_databot_data_file() -> pd.DataFrame | None:
+
+def read_databot_data_file(status_placeholder) -> pd.DataFrame | None:
     try:
-        df = pd.read_json(path_or_buf="./data/test_data.txt", lines=True)
+        datafile_path = "./data/test_data.txt"
+        if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag'] == 'Read from a Databot file':
+            # look for the file to watch
+            datafile_path = st.session_state['datafile_path']
+            if datafile_path:
+                while not Path(datafile_path).exists():
+                    status_placeholder.warning(f"Waiting for file: {datafile_path}")
+                    time.sleep(1)
+
+        status_placeholder.success(f"Reading from datafile: {datafile_path}")
+
+        df = pd.read_json(path_or_buf=datafile_path, lines=True)
         df.sort_values(by=['time'], ascending=False, inplace=True)
         return df
-    except:
+    except Exception as exc:
         return None
+
 
 def is_point_in_box(x1, y1, x2, y2, x, y):
     return (x1 <= x <= x2) and (y1 <= y <= y2)
@@ -186,84 +202,128 @@ def read_image(image_path: str):
     # _image = imutils.resize(_image, width, height)
     return im_rgb
 
-def setup_input_selection_sidebar():
-    with st.sidebar:
-        tab1, tab2, tab3 = st.tabs(['Databot Sensors', 'Collection Config', 'Data File Config'])
-        with tab1:
-            st.header("Databot Sensors")
-            fields = dataclasses.fields(DefaultDatabotConfig)
-            field_names = []
-            for field in fields:
-                field_names.append(field.name)
-            # field_names = sorted(field_names)
+def display_databot_sensors(tab_container, include_save_to_file: bool = True):
+    with tab_container:
+        st.header("Databot Sensors")
+        fields = dataclasses.fields(DefaultDatabotConfig)
+        field_names = []
+        for field in fields:
+            field_names.append(field.name)
+        # field_names = sorted(field_names)
 
-            for field_name in field_names:
-                if field_name in databot_sensors:
-                    databot_sensor = databot_sensors[field_name]
+        for field_name in field_names:
+            if field_name in databot_sensors:
+                databot_sensor = databot_sensors[field_name]
+                if include_save_to_file:
                     col1, col2, col3 = st.columns(3)
 
                     with col1:
                         st.write(databot_sensor['friendly_name'])
                     with col2:
-                        st.checkbox("SaveToFile", value=databot_sensor['save'],  key=f"{field_name}_save_cb")
+                        st.checkbox("SaveToFile", value=databot_sensor['save'], key=f"{field_name}_save_cb")
                     with col3:
                         st.checkbox("Display", value=databot_sensor['display'], key=f"{field_name}_display_cb")
-        with tab2:
-            st.header("Databot Refresh Rate in milliseconds")
-            cols = st.columns(2)
-            with cols[0]:
-                pass
+                else:
+                    col1, col2, col3 = st.columns(3)
 
-            with cols[1]:
-                st.number_input(label="Refresh rate in ms", min_value=100, max_value=1000, value=1000, step=100,
-                                key="databot_data_refresh_rate")
-            st.divider()
+                    with col1:
+                        st.write(databot_sensor['friendly_name'])
+                    with col2:
+                        st.empty()
+                    with col3:
+                        st.checkbox("Display", value=databot_sensor['display'], key=f"{field_name}_display_cb")
 
 
-            st.header("Display the last 'n' number of data samples.")
-            col4, col5 = st.columns(2)
-            with col4:
-                st.write("Set to zero for all data values")
+def setup_input_selection_sidebar():
+    with st.sidebar:
+        run_mode = st.radio(label='How would you like to read Databot data',
+                            options=['Launch Databot script', 'Read from a Databot file'],
+                            key="run_mode_flag")
 
-            with col5:
-                st.number_input(label="Number of samples to display", min_value=0, max_value=300, value=0, step=1,
-                                key="number_of_samples_to_display")
+        if run_mode == 'Launch Databot script':
+            tab1, tab2 = st.tabs(['Databot Sensors', 'Collection Config'])
+            display_databot_sensors(tab1)
+            # with tab1:
+            #     st.header("Databot Sensors")
+            #     fields = dataclasses.fields(DefaultDatabotConfig)
+            #     field_names = []
+            #     for field in fields:
+            #         field_names.append(field.name)
+            #     # field_names = sorted(field_names)
+            #
+            #     for field_name in field_names:
+            #         if field_name in databot_sensors:
+            #             databot_sensor = databot_sensors[field_name]
+            #             col1, col2, col3 = st.columns(3)
+            #
+            #             with col1:
+            #                 st.write(databot_sensor['friendly_name'])
+            #             with col2:
+            #                 st.checkbox("SaveToFile", value=databot_sensor['save'], key=f"{field_name}_save_cb")
+            #             with col3:
+            #                 st.checkbox("Display", value=databot_sensor['display'], key=f"{field_name}_display_cb")
+            with tab2:
+                st.header("Databot Refresh Rate in milliseconds")
+                cols = st.columns(2)
+                with cols[0]:
+                    pass
 
-            st.divider()
-            st.header("Total number of samples to collect")
-            col6, col7 = st.columns(2)
-            with col6:
-                st.write("Set to zero for unlimited datapoints")
-            with col7:
-                st.number_input(label="Number of samples to collect", min_value=0, max_value=5000, value=0, step=1,
-                                key="number_of_samples_to_collect")
+                with cols[1]:
+                    st.number_input(label="Refresh rate in ms", min_value=100, max_value=1000, value=1000, step=100,
+                                    key="databot_data_refresh_rate")
+                st.divider()
 
-        with tab3:
-            st.header("Data file configuration")
-            st.text("Use this configuration if you want to read a Databot json")
-            st.text("data file that is being created by another process")
-            st.divider()
-            st.file_uploader(label='JSON Data File', type=['json', 'txt'], accept_multiple_files=False, key="json_data_file_path")
+                st.header("Display the last 'n' number of data samples.")
+                col4, col5 = st.columns(2)
+                with col4:
+                    st.write("Set to zero for all data values")
 
-def get_checked_save_to_file() -> list[Tuple[str,str]]:
+                with col5:
+                    st.number_input(label="Number of samples to display", min_value=0, max_value=300, value=0, step=1,
+                                    key="number_of_samples_to_display")
+
+                st.divider()
+                st.header("Total number of samples to collect")
+                col6, col7 = st.columns(2)
+                with col6:
+                    st.write("Set to zero for unlimited datapoints")
+                with col7:
+                    st.number_input(label="Number of samples to collect", min_value=0, max_value=5000, value=0, step=1,
+                                    key="number_of_samples_to_collect")
+        else:
+            tab1, tab2 = st.tabs(['Databot Sensors', 'Data File Config'])
+            display_databot_sensors(tab1, include_save_to_file=False)
+            with tab2:
+                st.header("Data file configuration")
+                st.text("Use this configuration if you want to read a Databot json")
+                st.text("data file that is being created by another process")
+                st.divider()
+                saved_datafile_path = st.session_state.get('saved_datafile_path', default="")
+                last_datafile_path = st.text_input(label='JSON Data File', value=saved_datafile_path, placeholder="Full path to the Databot JSON data file",
+                              key="datafile_path")
+                st.session_state['saved_datafile_path'] = last_datafile_path
+
+def get_checked_save_to_file() -> list[Tuple[str, str]]:
     checked = []
     fields = dataclasses.fields(DefaultDatabotConfig)
     for field in fields:
         checkbox_key = f"{field.name}_save_cb"
         if checkbox_key in list(st.session_state.keys()):
-            if st.session_state[checkbox_key]: # if the checkbox is True in the session state return it
+            if st.session_state[checkbox_key]:  # if the checkbox is True in the session state return it
                 checked.append((checkbox_key, checkbox_key.split("_")[0]))
     return checked
 
-def get_checked_display_chart() -> list[Tuple[str,str]]:
+
+def get_checked_display_chart() -> list[Tuple[str, str]]:
     checked = []
     fields = dataclasses.fields(DefaultDatabotConfig)
     for field in fields:
         checkbox_key = f"{field.name}_display _cb"
         if checkbox_key in list(st.session_state.keys()):
-            if st.session_state[checkbox_key]: # if the checkbox is True in the session state return it
+            if st.session_state[checkbox_key]:  # if the checkbox is True in the session state return it
                 checked.append((checkbox_key, checkbox_key.split("_")[0]))
     return checked
+
 
 def create_databot_config() -> DatabotConfig:
     databot_config = DatabotConfig()
@@ -280,20 +340,24 @@ def create_databot_config() -> DatabotConfig:
     #             setattr(databot_config, field.name, True)
     return databot_config
 
+
 def collect_data_on_click():
     if 'pydatabot_process' not in st.session_state:
-        # remove datafile
-        if Path("./data/test_data.txt").exists():
-            Path("./data/test_data.txt").unlink()
-        databot_config: DatabotConfig = create_databot_config()
-        with open("streamlit_databot_config.pkl", "wb") as f:
-            pickle.dump(databot_config, f)
-        # windows needs shell=True, macos shell=False
-        if "windows" in platform.system().lower():
-            shell_flag = True
-        else:
-            shell_flag = False
-        st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"], cwd=Path(".").absolute(), shell=shell_flag)
+        if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag'] == 'Launch Databot script':
+            # remove datafile
+            if Path("./data/test_data.txt").exists():
+                Path("./data/test_data.txt").unlink()
+            databot_config: DatabotConfig = create_databot_config()
+            with open("streamlit_databot_config.pkl", "wb") as f:
+                pickle.dump(databot_config, f)
+            # windows needs shell=True, macos shell=False
+            if "windows" in platform.system().lower():
+                shell_flag = True
+            else:
+                shell_flag = False
+            st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"],
+                                                                  cwd=Path(".").absolute(), shell=shell_flag)
+    st.session_state['read_data_flag'] = True
 
 
 def stop_collecting_data_on_click():
@@ -301,69 +365,75 @@ def stop_collecting_data_on_click():
         st.session_state.pydatabot_process.terminate()
         del st.session_state['pydatabot_process']
 
+    st.session_state['read_data_flag'] = False
+    st.session_state['data_refresh'] = False
 
-def draw_dashboard(placeholder_component, refresh_rate: int = 1):
-    with placeholder_component.container():
-        df = read_databot_data_file()
-        if df is not None:
-            st.write(f":cyan[Number of records read: {df.shape[0]}]")
 
-            # if the pydata is processing/collecting data
-            # then check to see if we should stop collecting
-            if 'pydatabot_process' in st.session_state:
-                number_of_samples_to_collect = st.session_state['number_of_samples_to_collect']
-                if number_of_samples_to_collect > 0 and df.shape[0] >= number_of_samples_to_collect:
-                    stop_collecting_data_on_click()
-                    return
+def draw_dashboard(placeholder_component, status_placeholder, refresh_rate: int = 1):
+    if 'read_data_flag' in st.session_state and st.session_state['read_data_flag']:
+        with placeholder_component.container():
+            st.info("Reading datafile...")
+            df = read_databot_data_file(status_placeholder)
+            if df is not None:
+                st.write(f":cyan[Number of records read: {df.shape[0]}]")
 
-            st.dataframe(df, use_container_width=True)
-            fields = dataclasses.fields(DefaultDatabotConfig)
-            for field in fields:
-                checkbox_key = f"{field.name}_display_cb"
-                if checkbox_key in list(st.session_state.keys()):
-                    if st.session_state[checkbox_key]:
-                        data_columns = databot_sensors[field.name]['data_columns']
-                        if len(data_columns) == 1:
-                            # then there is only a single metric for this sensor
-                            number_of_samples_to_display = st.session_state['number_of_samples_to_display']
-                            if number_of_samples_to_display > 0:
-                                df = df.head(number_of_samples_to_display)
-                            # st.line_chart(df, x="time", y=data_column, use_container_width=True)
-                            try:
-                                st.divider()
-                                st.write(databot_sensors[field.name]['friendly_name'])
-                                c = alt.Chart(df).mark_line().encode(x='time', y=data_columns[0])
-                                st.altair_chart(c, use_container_width=True)
-                            except:
-                                pass
-                        else:
-                            # make multi-line line chart in altair.... which is a little weird for the data
-                            # https://altair-viz.github.io/user_guide/data.html#long-form-vs-wide-form-data
+                # if the pydata is processing/collecting data
+                # then check to see if we should stop collecting
+                if 'pydatabot_process' in st.session_state:
+                    number_of_samples_to_collect = st.session_state['number_of_samples_to_collect']
+                    if number_of_samples_to_collect > 0 and df.shape[0] >= number_of_samples_to_collect:
+                        stop_collecting_data_on_click()
+                        return
 
-                            # df_cols are the columns we expect from collecting data
-                            df_cols = data_columns.copy()
-                            df_cols.append("time")
-                            try:
-                                # it is possible that the new selection and the existing data have
-                                # different columns...
-                                df_sensor_values = df[df_cols]
-                                # print(df_sensor_values.columns)
-                                number_of_samples_to_display = st.session_state['number_of_samples_to_display']
+                st.dataframe(df, use_container_width=True)
+                fields = dataclasses.fields(DefaultDatabotConfig)
+                for field in fields:
+                    checkbox_key = f"{field.name}_display_cb"
+                    if checkbox_key in list(st.session_state.keys()):
+                        if st.session_state[checkbox_key]:
+                            data_columns = databot_sensors[field.name]['data_columns']
+                            if len(data_columns) == 1:
+                                # then there is only a single metric for this sensor
+                                number_of_samples_to_display = st.session_state.get('number_of_samples_to_display', default=0)
                                 if number_of_samples_to_display > 0:
-                                    df_sensor_values = df_sensor_values.head(number_of_samples_to_display)
+                                    df = df.head(number_of_samples_to_display)
+                                # st.line_chart(df, x="time", y=data_column, use_container_width=True)
+                                try:
+                                    st.divider()
+                                    st.write(databot_sensors[field.name]['friendly_name'])
+                                    c = alt.Chart(df).mark_line().encode(x='time', y=data_columns[0])
+                                    st.altair_chart(c, use_container_width=True)
+                                except:
+                                    pass
+                            else:
+                                # make multi-line line chart in altair.... which is a little weird for the data
+                                # https://altair-viz.github.io/user_guide/data.html#long-form-vs-wide-form-data
 
-                                st.divider()
-                                st.write(databot_sensors[field.name]['friendly_name'])
-                                c = alt.Chart(df_sensor_values).transform_fold(
-                                    databot_sensors[field.name]['data_columns'],
-                                    as_=['sensor_name', 'sensor_value']
-                                ).mark_line().encode(x='time:T', y='sensor_value:Q', color='sensor_name:N')
-                                st.altair_chart(c, use_container_width=True)
-                            except:
-                                pass
+                                # df_cols are the columns we expect from collecting data
+                                df_cols = data_columns.copy()
+                                df_cols.append("time")
+                                try:
+                                    # it is possible that the new selection and the existing data have
+                                    # different columns...
+                                    df_sensor_values = df[df_cols]
+                                    # print(df_sensor_values.columns)
+                                    number_of_samples_to_display = st.session_state.get('number_of_samples_to_display', 0)
+                                    if number_of_samples_to_display > 0:
+                                        df_sensor_values = df_sensor_values.head(number_of_samples_to_display)
+
+                                    st.divider()
+                                    st.write(databot_sensors[field.name]['friendly_name'])
+                                    c = alt.Chart(df_sensor_values).transform_fold(
+                                        databot_sensors[field.name]['data_columns'],
+                                        as_=['sensor_name', 'sensor_value']
+                                    ).mark_line().encode(x='time:T', y='sensor_value:Q', color='sensor_name:N')
+                                    st.altair_chart(c, use_container_width=True)
+                                except:
+                                    pass
 
     if refresh_rate > 0:
         time.sleep(refresh_rate)
+
 
 def highlight_selected_sensor(db_image):
     fields = dataclasses.fields(DefaultDatabotConfig)
@@ -375,12 +445,14 @@ def highlight_selected_sensor(db_image):
                 key, value = find_image_map_entry(checkbox_key.split("_")[0])
                 print(key, value)
 
+
 def main():
     st.header("DroneBlocks databot2.0 Dashboard")
     setup_input_selection_sidebar()
     tab1, tab2 = st.tabs(["Dashboard", "Sensor Map"])
 
     with tab1:
+        status_placeholder = st.empty()
         col1, col2, col3 = st.columns(3)
         st.divider()
         with col1:
@@ -393,13 +465,12 @@ def main():
         placeholder = st.empty()
 
         while 'data_refresh' in st.session_state and st.session_state['data_refresh']:
-            if 'pydatabot_process' in st.session_state:
-                draw_dashboard(placeholder)
+            if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag']:
+                draw_dashboard(placeholder, status_placeholder)
             else:
                 break
 
-        draw_dashboard(placeholder, refresh_rate=0)
-
+        draw_dashboard(placeholder, status_placeholder, refresh_rate=0)
 
     with tab2:
         st.write("Sensor Map")
