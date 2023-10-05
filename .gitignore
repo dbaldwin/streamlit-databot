@@ -299,3 +299,5 @@ cython_debug/
 
 .idea
 /data/test_data.txt
+/data/*.*
+
