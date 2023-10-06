@@ -24,6 +24,49 @@ st.set_page_config(
 )
 
 
+# ****************************************************
+#           CLICK HANDLERS
+# ****************************************************
+
+def continue_btn_on_click():
+    st.session_state.run_mode = 'start'
+
+
+def pause_btn_on_click():
+    print("****** PAUSE")
+    st.session_state.run_mode = 'pause'
+
+
+def stop_collecting_data_on_click():
+    if 'pydatabot_process' in st.session_state:
+        st.session_state.pydatabot_process.terminate()
+        del st.session_state['pydatabot_process']
+
+    st.session_state['read_data_flag'] = False
+    st.session_state['data_refresh'] = False
+    st.session_state.run_mode = 'stop'
+
+
+def collect_data_on_click():
+    if 'pydatabot_process' not in st.session_state:
+        if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag'] == 'Launch Databot script':
+            # remove datafile
+            if Path(DATABOT_DATA_FILE).exists():
+                Path(DATABOT_DATA_FILE).unlink()
+            databot_config: DatabotConfig = create_databot_config()
+            with open("streamlit_databot_config.pkl", "wb") as f:
+                pickle.dump(databot_config, f)
+            # windows needs shell=True, macos shell=False
+            if "windows" in platform.system().lower():
+                shell_flag = True
+            else:
+                shell_flag = False
+            st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"],
+                                                                  cwd=Path(".").absolute(), shell=shell_flag)
+    st.session_state['read_data_flag'] = True
+    st.session_state.run_mode = 'start'
+
+
 def read_databot_data_file(status_placeholder) -> pd.DataFrame | None:
     try:
         datafile_path = DATABOT_DATA_FILE
@@ -54,96 +97,80 @@ def create_databot_config() -> DatabotConfig:
     return databot_config
 
 
-def collect_data_on_click():
-    if 'pydatabot_process' not in st.session_state:
-        if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag'] == 'Launch Databot script':
-            # remove datafile
-            if Path(DATABOT_DATA_FILE).exists():
-                Path(DATABOT_DATA_FILE).unlink()
-            databot_config: DatabotConfig = create_databot_config()
-            with open("streamlit_databot_config.pkl", "wb") as f:
-                pickle.dump(databot_config, f)
-            # windows needs shell=True, macos shell=False
-            if "windows" in platform.system().lower():
-                shell_flag = True
-            else:
-                shell_flag = False
-            st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"],
-                                                                  cwd=Path(".").absolute(), shell=shell_flag)
-    st.session_state['read_data_flag'] = True
+def _display_dataframe_data(df: pd.DataFrame):
+    if df is None:
+        return
 
+    st.write(f":cyan[Number of records read: {df.shape[0]}]")
 
-def stop_collecting_data_on_click():
+    # if the pydata is processing/collecting data
+    # then check to see if we should stop collecting
     if 'pydatabot_process' in st.session_state:
-        st.session_state.pydatabot_process.terminate()
-        del st.session_state['pydatabot_process']
+        number_of_samples_to_collect = st.session_state['number_of_samples_to_collect']
+        if number_of_samples_to_collect > 0 and df.shape[0] >= number_of_samples_to_collect:
+            stop_collecting_data_on_click()
+            return
 
-    st.session_state['read_data_flag'] = False
-    st.session_state['data_refresh'] = False
+    st.dataframe(df, use_container_width=True)
+    display_fields_records = get_display_fields_from_sensor_table()
+    for field in display_fields_records:
+        data_columns = field['data_columns']
+        if len(data_columns) == 1:
+            # then there is only a single metric for this sensor
+            number_of_samples_to_display = st.session_state.get('number_of_samples_to_display', default=0)
+            if number_of_samples_to_display > 0:
+                df = df.head(number_of_samples_to_display)
+            # st.line_chart(df, x="time", y=data_column, use_container_width=True)
+            try:
+                st.divider()
+                st.write(field['friendly_name'])
+                c = alt.Chart(df).mark_line().encode(x='time', y=data_columns[0])
+                st.altair_chart(c, use_container_width=True)
+            except:
+                pass
+        else:
+            # make multi-line line chart in altair.... which is a little weird for the data
+            # https://altair-viz.github.io/user_guide/data.html#long-form-vs-wide-form-data
+
+            # df_cols are the columns we expect from collecting data
+            df_cols = data_columns.copy()
+            df_cols.append("time")
+            try:
+                # it is possible that the new selection and the existing data have
+                # different columns...
+                df_sensor_values = df[df_cols]
+                # print(df_sensor_values.columns)
+                number_of_samples_to_display = st.session_state.get('number_of_samples_to_display', 0)
+                if number_of_samples_to_display > 0:
+                    df_sensor_values = df_sensor_values.head(number_of_samples_to_display)
+
+                st.divider()
+                st.write(field['friendly_name'])
+                c = alt.Chart(df_sensor_values).transform_fold(field['data_columns'],
+                                                               as_=['sensor_name', 'sensor_value']
+                                                               ).mark_line().encode(x='time:T',
+                                                                                    y='sensor_value:Q',
+                                                                                    color='sensor_name:N')
+                st.altair_chart(c, use_container_width=True)
+            except:
+                pass
 
 
-def draw_dashboard(placeholder_component, status_placeholder, refresh_rate: int = 1):
-    if 'read_data_flag' in st.session_state and st.session_state['read_data_flag']:
+def draw_dashboard(placeholder_component, status_placeholder):
+    if st.session_state.run_mode == 'start':
         with placeholder_component.container():
             st.info("Reading datafile...")
             df = read_databot_data_file(status_placeholder)
             if df is not None:
-                st.write(f":cyan[Number of records read: {df.shape[0]}]")
-
-                # if the pydata is processing/collecting data
-                # then check to see if we should stop collecting
-                if 'pydatabot_process' in st.session_state:
-                    number_of_samples_to_collect = st.session_state['number_of_samples_to_collect']
-                    if number_of_samples_to_collect > 0 and df.shape[0] >= number_of_samples_to_collect:
-                        stop_collecting_data_on_click()
-                        return
-
-                st.dataframe(df, use_container_width=True)
-                display_fields_records = get_display_fields_from_sensor_table()
-                for field in display_fields_records:
-                    data_columns = field['data_columns']
-                    if len(data_columns) == 1:
-                        # then there is only a single metric for this sensor
-                        number_of_samples_to_display = st.session_state.get('number_of_samples_to_display', default=0)
-                        if number_of_samples_to_display > 0:
-                            df = df.head(number_of_samples_to_display)
-                        # st.line_chart(df, x="time", y=data_column, use_container_width=True)
-                        try:
-                            st.divider()
-                            st.write(field['friendly_name'])
-                            c = alt.Chart(df).mark_line().encode(x='time', y=data_columns[0])
-                            st.altair_chart(c, use_container_width=True)
-                        except:
-                            pass
-                    else:
-                        # make multi-line line chart in altair.... which is a little weird for the data
-                        # https://altair-viz.github.io/user_guide/data.html#long-form-vs-wide-form-data
-
-                        # df_cols are the columns we expect from collecting data
-                        df_cols = data_columns.copy()
-                        df_cols.append("time")
-                        try:
-                            # it is possible that the new selection and the existing data have
-                            # different columns...
-                            df_sensor_values = df[df_cols]
-                            # print(df_sensor_values.columns)
-                            number_of_samples_to_display = st.session_state.get('number_of_samples_to_display', 0)
-                            if number_of_samples_to_display > 0:
-                                df_sensor_values = df_sensor_values.head(number_of_samples_to_display)
-
-                            st.divider()
-                            st.write(field['friendly_name'])
-                            c = alt.Chart(df_sensor_values).transform_fold(field['data_columns'],
-                                                                           as_=['sensor_name', 'sensor_value']
-                                                                           ).mark_line().encode(x='time:T',
-                                                                                                y='sensor_value:Q',
-                                                                                                color='sensor_name:N')
-                            st.altair_chart(c, use_container_width=True)
-                        except:
-                            pass
-
-    if refresh_rate > 0:
-        time.sleep(refresh_rate)
+                st.session_state.last_df = df
+                _display_dataframe_data(df)
+    else:
+        # get the last dataframe read to display that
+        with placeholder_component.container():
+            st.info("Reading datafile...")
+            df = read_databot_data_file(status_placeholder)
+            if df is not None:
+                _display_dataframe_data(df)
 
 
 def highlight_selected_sensor(db_image):
@@ -152,9 +179,7 @@ def highlight_selected_sensor(db_image):
         checkbox_key = f"{field.name}_save_cb"
         if checkbox_key in list(st.session_state.keys()):
             if st.session_state[checkbox_key] == True:
-                print(f"Key: {checkbox_key}: {st.session_state[checkbox_key]}")
                 key, value = find_image_map_entry(checkbox_key.split("_")[0])
-                print(key, value)
 
 
 def main():
@@ -168,30 +193,48 @@ def main():
         status_placeholder = st.empty()
         col1, col2, col3 = st.columns(3)
         st.divider()
-        with col1:
-            if 'read_data_flag' in st.session_state and st.session_state.read_data_flag:
-                st.button("Start Reading Data", key='collect_data_btn', disabled=True)
-            else:
+        with col1:  # start button
+            if st.session_state.run_mode == 'stop':
                 st.button("Start Reading Data", key='collect_data_btn', on_click=collect_data_on_click, disabled=False)
-        with col2:
-            if 'read_data_flag' in st.session_state and not st.session_state.read_data_flag:
+            elif st.session_state.run_mode == 'start' or st.session_state.run_mode == 'pause':
+                st.button("Start Reading Data", key='collect_data_btn', disabled=True)
+
+        with col2:  # stop button
+            if st.session_state.run_mode == 'stop':
                 st.button("Stop Reading Data", key="stop_collect_data_btn", disabled=True)
-            else:
+            elif st.session_state.run_mode == 'start' or st.session_state.run_mode == 'pause':
                 st.button("Stop Reading Data", key="stop_collect_data_btn", on_click=stop_collecting_data_on_click,
                           disabled=False)
-        with col3:
-            st.button("Pause Reading Data", key="pause_collect_data_btn", disabled=True)
-            # st.checkbox(label="Refresh Charts", value=False, key="data_refresh")
+
+        with col3:  # pause/continue button
+            if st.session_state.run_mode == 'stop':
+                st.button("Pause Reading Data", key="pause_collect_data_btn", disabled=True)
+            elif st.session_state.run_mode == 'start':
+                st.button("Pause Reading Data", key="pause_collect_data_btn", disabled=False,
+                          on_click=pause_btn_on_click)
+            elif st.session_state.run_mode == 'pause':
+                st.button("Continue Reading Data", key="pause_collect_data_btn", disabled=False,
+                          on_click=continue_btn_on_click)
 
         placeholder = st.empty()
 
-        while 'data_refresh' in st.session_state and st.session_state['data_refresh']:
-            if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag']:
+        # ************************************************
+        #           DATABOT DISPLAY EVENT LOOP
+        # ************************************************
+        try:
+            while st.session_state.run_mode == 'start':
                 draw_dashboard(placeholder, status_placeholder)
-            else:
-                break
+                time.sleep(1)
+        except Exception as exc:
+            pass
 
-        draw_dashboard(placeholder, status_placeholder, refresh_rate=0)
+        try:
+            if st.session_state.run_mode == 'stop' or st.session_state.run_mode == 'pause':
+                draw_dashboard(placeholder, status_placeholder)
+        except:
+            pass
+        finally:
+            time.sleep(0.2)
 
     with tab2:
         st.write("Sensor Map")
@@ -219,7 +262,8 @@ def main():
 def init_app_once():
     print("**** init app")
     st.session_state['data_refresh'] = False
-    st.session_state.run_mode = 'stop' # 'start', 'stop', 'pause'
+    st.session_state.run_mode = 'stop'  # 'start', 'stop', 'pause'
+    st.session_state.last_df = None
     return 1
 
 
