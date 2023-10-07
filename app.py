@@ -33,7 +33,6 @@ def continue_btn_on_click():
 
 
 def pause_btn_on_click():
-    print("****** PAUSE")
     st.session_state.run_mode = 'pause'
 
 
@@ -78,6 +77,9 @@ def read_databot_data_file(status_placeholder) -> pd.DataFrame | None:
                 while not Path(datafile_path).exists():
                     status_placeholder.warning(f"Waiting for file: {datafile_path}")
                     time.sleep(1)
+
+        if not datafile_path:
+            return None
 
         status_placeholder.success(f"Reading from datafile: {datafile_path}")
 
@@ -155,7 +157,7 @@ def _display_dataframe_data(df: pd.DataFrame):
 def draw_dashboard(placeholder_component, status_placeholder):
     if st.session_state.run_mode == 'start':
         with placeholder_component.container():
-            st.info("Reading datafile...")
+            # st.info("Reading datafile...")
             df = read_databot_data_file(status_placeholder)
             if df is not None:
                 st.session_state.last_df = df
@@ -163,7 +165,7 @@ def draw_dashboard(placeholder_component, status_placeholder):
     else:
         # get the last dataframe read to display that
         with placeholder_component.container():
-            st.info("Reading datafile...")
+            # st.info("Reading datafile...")
             df = read_databot_data_file(status_placeholder)
             if df is not None:
                 _display_dataframe_data(df)
@@ -271,7 +273,6 @@ def main():
 
 @st.cache_data
 def init_app_once():
-    print("**** init app")
     st.session_state['data_refresh'] = False
     st.session_state.run_mode = 'stop'  # 'start', 'stop', 'pause'
     st.session_state.last_df = None
