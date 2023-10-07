@@ -62,9 +62,12 @@ def display_databot_sensors_from_df(tab_container, include_save_to_file: bool = 
 
 def setup_input_selection_sidebar():
     with st.sidebar:
-        run_mode = st.radio(label='How would you like to read Databot data',
+        st.title("Data Collection Config")
+        st.divider()
+        run_mode = st.radio(label='How would you like to read databot2.0™ data',
                             options=['Launch Databot script', 'Read from a Databot file'],
                             key="run_mode_flag")
+        st.divider()
 
         if run_mode == 'Launch Databot script':
             tab1, tab2 = st.tabs(['Databot Sensors', 'Collection Config'])
@@ -99,16 +102,27 @@ def setup_input_selection_sidebar():
                     st.number_input(label="Number of samples to collect", min_value=0, max_value=5000, value=0, step=1,
                                     key="number_of_samples_to_collect")
 
-
         else:
             tab1, tab2 = st.tabs(['Databot Sensors', 'Data File Config'])
             display_databot_sensors_from_df(tab1, include_save_to_file=False)
+
             with tab2:
                 st.header("Data file configuration")
                 st.text("Use this configuration if you want to read a Databot json")
                 st.text("data file that is being created by another process")
                 st.divider()
-                read_datafile_path = st.session_state.get('read_datafile_path', default="")
+                read_datafile_path = st.session_state.get('datafile_path', default="")
                 last_datafile_path = st.text_input(label='JSON Data File', value=read_datafile_path, placeholder="Full path to the Databot JSON data file",
-                              key="datafile_path")
-                st.session_state['read_datafile_path'] = last_datafile_path
+                              key="read_datafile_path")
+                st.session_state['datafile_path'] = last_datafile_path
+
+                st.divider()
+
+                st.header("Display the last 'n' number of data samples.")
+                col4, col5 = st.columns(2)
+                with col4:
+                    st.write("Set to zero for all data values")
+
+                with col5:
+                    st.number_input(label="Number of samples to display", min_value=0, max_value=300, value=0, step=1,
+                                    key="number_of_samples_to_display")

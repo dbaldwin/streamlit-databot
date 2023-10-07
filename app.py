@@ -50,6 +50,7 @@ def stop_collecting_data_on_click():
 def collect_data_on_click():
     if 'pydatabot_process' not in st.session_state:
         if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag'] == 'Launch Databot script':
+            st.session_state['datafile_path'] = DATABOT_DATA_FILE
             # remove datafile
             if Path(DATABOT_DATA_FILE).exists():
                 Path(DATABOT_DATA_FILE).unlink()
@@ -69,8 +70,8 @@ def collect_data_on_click():
 
 def read_databot_data_file(status_placeholder) -> pd.DataFrame | None:
     try:
-        datafile_path = DATABOT_DATA_FILE
-        if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag'] == 'Read from a Databot file':
+        datafile_path = st.session_state.get('datafile_path', default=DATABOT_DATA_FILE)
+        if st.session_state.run_mode == 'start':
             # look for the file to watch
             datafile_path = st.session_state['datafile_path']
             if datafile_path:
@@ -82,6 +83,8 @@ def read_databot_data_file(status_placeholder) -> pd.DataFrame | None:
 
         df = pd.read_json(path_or_buf=datafile_path, lines=True)
         df.sort_values(by=['time'], ascending=False, inplace=True)
+        if st.session_state['number_of_samples_to_display'] > 0:
+            df = df.head(st.session_state['number_of_samples_to_display'])
         return df
     except Exception as exc:
         return None
@@ -116,10 +119,6 @@ def _display_dataframe_data(df: pd.DataFrame):
     for field in display_fields_records:
         data_columns = field['data_columns']
         if len(data_columns) == 1:
-            # then there is only a single metric for this sensor
-            number_of_samples_to_display = st.session_state.get('number_of_samples_to_display', default=0)
-            if number_of_samples_to_display > 0:
-                df = df.head(number_of_samples_to_display)
             # st.line_chart(df, x="time", y=data_column, use_container_width=True)
             try:
                 st.divider()
@@ -140,9 +139,6 @@ def _display_dataframe_data(df: pd.DataFrame):
                 # different columns...
                 df_sensor_values = df[df_cols]
                 # print(df_sensor_values.columns)
-                number_of_samples_to_display = st.session_state.get('number_of_samples_to_display', 0)
-                if number_of_samples_to_display > 0:
-                    df_sensor_values = df_sensor_values.head(number_of_samples_to_display)
 
                 st.divider()
                 st.write(field['friendly_name'])
@@ -183,13 +179,28 @@ def highlight_selected_sensor(db_image):
 
 
 def main():
-    st.header("DroneBlocks databot2.0 Dashboard")
+    col_t1, col_t2, col_t3 = st.columns(3)
+    with col_t1:
+        st.write(' ')
+    with col_t2:
+        col_temp1, col_i1, col_i2, col_temp2 = st.columns([0.1, 0.45, 0.35, 0.1])
+        col_temp1.write(' ')
+        with col_i1:
+            st.image("./media/DB_logo_400px.jpg", use_column_width=True)
+        with col_i2:
+            st.image("./media/databot.png", use_column_width=True)
+        col_temp2.write(' ')
+    with col_t3:
+        st.write(' ')
+
+    st.header("DroneBlocks databot2.0™ Dashboard")
     setup_input_selection_sidebar()
-    tab1, tab2 = st.tabs(["Dashboard", "Sensor Map"])
+    # tab1, tab2 = st.tabs(["Dashboard", "Sensor Map"])
+    tab1 = st.tabs(["Dashboard"])
     if 'read_data_flag' not in st.session_state:
         st.session_state['read_data_flag'] = False
 
-    with tab1:
+    with tab1[0]:
         status_placeholder = st.empty()
         col1, col2, col3 = st.columns(3)
         st.divider()
@@ -236,26 +247,26 @@ def main():
         finally:
             time.sleep(0.2)
 
-    with tab2:
-        st.write("Sensor Map")
-        hotspots_df = read_hot_spots(DATABOT_HOTSPOTS_DATA)
-        st.dataframe(hotspots_df)
-        st.write(hotspots_df.shape)
-        the_image = read_image(DATABOT_IMAGE_PATH)
-        # st.image(image=the_image)
-
-        # highlight_selected_sensor(the_image)
-
-        value = streamlit_image_coordinates(source=the_image, height=650, width=650, key="db_image")
-        #
-        st.write(value)
-        if value is not None:
-            normal_x = value['x'] / the_image.shape[1]
-            normal_y = value['y'] / the_image.shape[0]
-            st.write(f"({normal_x},{normal_y})")
-            box = find_box(normal_x, normal_y, hotspots_df)
-            if box is not None:
-                print(f"Index: {box[0]}")
+    # with tab2:
+    #     st.write("Sensor Map")
+    #     hotspots_df = read_hot_spots(DATABOT_HOTSPOTS_DATA)
+    #     st.dataframe(hotspots_df)
+    #     st.write(hotspots_df.shape)
+    #     the_image = read_image(DATABOT_IMAGE_PATH)
+    #     # st.image(image=the_image)
+    #
+    #     # highlight_selected_sensor(the_image)
+    #
+    #     value = streamlit_image_coordinates(source=the_image, height=650, width=650, key="db_image")
+    #     #
+    #     st.write(value)
+    #     if value is not None:
+    #         normal_x = value['x'] / the_image.shape[1]
+    #         normal_y = value['y'] / the_image.shape[0]
+    #         st.write(f"({normal_x},{normal_y})")
+    #         box = find_box(normal_x, normal_y, hotspots_df)
+    #         if box is not None:
+    #             print(f"Index: {box[0]}")
 
 
 @st.cache_data
