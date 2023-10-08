@@ -19,10 +19,12 @@ from utils.sidebar_utils import setup_input_selection_sidebar, get_display_field
 
 st.set_page_config(
     page_title="DroneBlocks Databot Dashboard",
-    page_icon="✅",
+    page_icon="🧠",
     layout="wide",
 )
 
+def get_run_mode():
+    return st.session_state.get('run_mode', default='stop')
 
 # ****************************************************
 #           CLICK HANDLERS
@@ -70,7 +72,7 @@ def collect_data_on_click():
 def read_databot_data_file(status_placeholder) -> pd.DataFrame | None:
     try:
         datafile_path = st.session_state.get('datafile_path', default=DATABOT_DATA_FILE)
-        if st.session_state.run_mode == 'start':
+        if get_run_mode() == 'start':
             # look for the file to watch
             datafile_path = st.session_state['datafile_path']
             if datafile_path:
@@ -155,7 +157,7 @@ def _display_dataframe_data(df: pd.DataFrame):
 
 
 def draw_dashboard(placeholder_component, status_placeholder):
-    if st.session_state.run_mode == 'start':
+    if get_run_mode() == 'start':
         with placeholder_component.container():
             # st.info("Reading datafile...")
             df = read_databot_data_file(status_placeholder)
@@ -207,25 +209,25 @@ def main():
         col1, col2, col3 = st.columns(3)
         st.divider()
         with col1:  # start button
-            if st.session_state.run_mode == 'stop':
+            if st.session_state.get('run_mode', default='stop') == 'stop':
                 st.button("Start Reading Data", key='collect_data_btn', on_click=collect_data_on_click, disabled=False)
-            elif st.session_state.run_mode == 'start' or st.session_state.run_mode == 'pause':
+            elif get_run_mode() == 'start' or get_run_mode() == 'pause':
                 st.button("Start Reading Data", key='collect_data_btn', disabled=True)
 
         with col2:  # stop button
-            if st.session_state.run_mode == 'stop':
+            if get_run_mode() == 'stop':
                 st.button("Stop Reading Data", key="stop_collect_data_btn", disabled=True)
-            elif st.session_state.run_mode == 'start' or st.session_state.run_mode == 'pause':
+            elif get_run_mode() == 'start' or get_run_mode() == 'pause':
                 st.button("Stop Reading Data", key="stop_collect_data_btn", on_click=stop_collecting_data_on_click,
                           disabled=False)
 
         with col3:  # pause/continue button
-            if st.session_state.run_mode == 'stop':
+            if get_run_mode() == 'stop':
                 st.button("Pause Reading Data", key="pause_collect_data_btn", disabled=True)
-            elif st.session_state.run_mode == 'start':
+            elif get_run_mode() == 'start':
                 st.button("Pause Reading Data", key="pause_collect_data_btn", disabled=False,
                           on_click=pause_btn_on_click)
-            elif st.session_state.run_mode == 'pause':
+            elif get_run_mode() == 'pause':
                 st.button("Continue Reading Data", key="pause_collect_data_btn", disabled=False,
                           on_click=continue_btn_on_click)
 
@@ -235,14 +237,14 @@ def main():
         #           DATABOT DISPLAY EVENT LOOP
         # ************************************************
         try:
-            while st.session_state.run_mode == 'start':
+            while get_run_mode() == 'start':
                 draw_dashboard(placeholder, status_placeholder)
                 time.sleep(1)
         except Exception as exc:
             pass
 
         try:
-            if st.session_state.run_mode == 'stop' or st.session_state.run_mode == 'pause':
+            if get_run_mode() == 'stop' or get_run_mode() == 'pause':
                 draw_dashboard(placeholder, status_placeholder)
         except:
             pass
