@@ -146,7 +146,7 @@ def _display_dataframe_data(df: pd.DataFrame):
 
                 st.divider()
                 st.write(field['friendly_name'])
-                c = alt.Chart(df_sensor_values).transform_fold(field['data_columns'],
+                c = alt.Chart(df_sensor_values).transform_fold(field['data_columns'], 
                                                                as_=['sensor_name', 'sensor_value']
                                                                ).mark_line().encode(x='time:T',
                                                                                     y='sensor_value:Q',
@@ -190,9 +190,9 @@ def main():
         col_temp1, col_i1, col_i2, col_temp2 = st.columns([0.1, 0.45, 0.35, 0.1])
         col_temp1.write(' ')
         with col_i1:
-            st.image("./media/DB_logo_400px.jpg", use_column_width=True)
+            st.image(str(Path("./media/DB_logo_400px.jpg").absolute()), use_column_width=True)
         with col_i2:
-            st.image("./media/databot.png", use_column_width=True)
+            st.image(str(Path("./media/databot.png").absolute()), use_column_width=True)
         col_temp2.write(' ')
     with col_t3:
         st.write(' ')

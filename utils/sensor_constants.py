@@ -1,7 +1,8 @@
+from pathlib import Path
 
-DATABOT_DATA_FILE = "./data/databot_data.json"
-DATABOT_IMAGE_PATH = "./hotspots/databot.png"
-DATABOT_HOTSPOTS_DATA = "./hotspots/databot-hotspots.csv"
+DATABOT_DATA_FILE = Path("./data/databot_data.json").absolute()
+DATABOT_IMAGE_PATH = Path("./hotspots/databot.png").absolute()
+DATABOT_HOTSPOTS_DATA = Path("./hotspots/databot-hotspots.csv").absolute()
 
 magneto_description = """The "magneto" is shorthand term for a "magnetometer," which is one of the sensors on the Databot2.0 device. A magnetometer is an instrument used to measure the strength and direction of magnetic fields. It can detect the presence of nearby magnetic objects or magnetic fields and is commonly used in various applications, such as navigation, geophysics, robotics, and consumer electronics.
 
