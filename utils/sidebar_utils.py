@@ -13,13 +13,14 @@ def get_display_fields_from_sensor_table() -> List[dict]:
     return json_records
 
 def get_save_fields_from_sensor_table() -> List[dict]:
-    # it is possible that someone will just click display,
-    # so to do what seems reasonable, look for save or display
-    sensor_select_df = st.session_state.updated_sensor_df
-    display_chart_df = sensor_select_df.query("save == True | display == True").sort_values(by="friendly_name")
-    json_records = json.loads(display_chart_df.to_json(orient='records'))
-
-    return json_records
+    return get_display_fields_from_sensor_table()
+    # # it is possible that someone will just click display,
+    # # so to do what seems reasonable, look for save or display
+    # sensor_select_df = st.session_state.updated_sensor_df
+    # display_chart_df = sensor_select_df.query("save == True | display == True").sort_values(by="friendly_name")
+    # json_records = json.loads(display_chart_df.to_json(orient='records'))
+    #
+    # return json_records
 
 
 @st.cache_data
@@ -38,7 +39,7 @@ def display_databot_sensors_from_df(tab_container, include_save_to_file: bool = 
                                     label="Save To File"
                                 ),
         "display": st.column_config.CheckboxColumn(
-            label="Display Charts"
+            label="Save & Display"
         )
     }
     column_order = ("friendly_name", "save", "display",)
@@ -66,12 +67,14 @@ def setup_input_selection_sidebar():
         st.divider()
         run_mode = st.radio(label='How would you like to read databot2.0™ data',
                             options=['Launch Databot script', 'Read from a Databot file'],
+                            captions=['Run a script that will collect data in real time. \nThis will launch a databot process to read sensor values and save them to a file.', 'Read data from an existing file, which can be updated by a separate PyDatabot application.'],
+                            help='Launching a script will run a python script in a separate process that will write data to a file and display that data.  Reading from a file will not launch a process, but instead just read from a file that may be static, or being populated by a different script reading from the databot.',
                             key="run_mode_flag")
         st.divider()
 
         if run_mode == 'Launch Databot script':
             tab1, tab2 = st.tabs(['Databot Sensors', 'Collection Config'])
-            display_databot_sensors_from_df(tab1)
+            display_databot_sensors_from_df(tab1, include_save_to_file=False)
 
             with tab2:
                 st.header("Databot Refresh Rate in milliseconds")
@@ -80,7 +83,7 @@ def setup_input_selection_sidebar():
                     pass
 
                 with cols[1]:
-                    st.number_input(label="Refresh rate in ms", min_value=100, max_value=1000, value=1000, step=100,
+                    st.number_input(label="Refresh rate in ms", min_value=100, max_value=1000000, value=1000, step=100,
                                     key="databot_data_refresh_rate")
                 st.divider()
 

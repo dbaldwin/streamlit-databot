@@ -55,18 +55,20 @@ databot_sensors = {
     #     'save': False,
     #     'display': False
     # },
-    # 'Etemp1': {
-    #     'sensor_name': 'Etemp1',
-    #     'friendly_name': 'External Temperature 1',
-    #     'save': False,
-    #     'display': False
-    # },
-    # 'Etemp2': {
-    #     'sensor_name': 'Etemp2',
-    #     'friendly_name': 'External Temperature 2',
-    #     'save': False,
-    #     'display': False
-    # },
+    'Etemp1': {
+        'sensor_name': 'Etemp1',
+        'friendly_name': 'External Temperature 1',
+        'save': False,
+        'display': False,
+        'data_columns': ['external_temp_1']
+    },
+    'Etemp2': {
+        'sensor_name': 'Etemp2',
+        'friendly_name': 'External Temperature 2',
+        'save': False,
+        'display': False,
+        'data_columns': ['external_temp_2']
+    },
     'pressure': {
         'sensor_name': 'pressure',
         'friendly_name': 'Atmospheric Pressure',
@@ -123,13 +125,13 @@ databot_sensors = {
         'display': False,
         'data_columns': ['humidity']
     },
-    'humTemp': {
-        'sensor_name': 'humTemp',
-        'friendly_name': 'Humidity Adjusted Temperature',
-        'save': False,
-        'display': False,
-        'data_columns': ['humidity_temperature']
-    },
+    # 'humTemp': {
+    #     'sensor_name': 'humTemp',
+    #     'friendly_name': 'Humidity Adjusted Temperature',
+    #     'save': False,
+    #     'display': False,
+    #     'data_columns': ['humidity_temperature']
+    # },
     # 'Sdist': {
     #     'sensor_name': 'Sdist',
     #     'friendly_name': 'Short Distance',
@@ -146,7 +148,7 @@ databot_sensors = {
     },
     'Ldist': {
         'sensor_name': 'Ldist',
-        'friendly_name': 'Long Distance',
+        'friendly_name': 'Laser Distance',
         'save': False,
         'display': False,
         'data_columns': ['distance']
