@@ -4,3 +4,4 @@ streamlit-image-coordinates
 imutils
 opencv-python
 pandas
+requests

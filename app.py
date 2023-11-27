@@ -2,18 +2,18 @@ import dataclasses
 import pickle
 import platform
 import subprocess
+import threading
 import time
 from pathlib import Path
+import json
 
 import altair as alt
 import pandas as pd
+import requests
 import streamlit as st
 from databot.PyDatabot import DefaultDatabotConfig, DatabotConfig
-from streamlit_image_coordinates import streamlit_image_coordinates
-
 from hotspots.databot_image_map import find_image_map_entry
-from utils.databot_image_utils import find_box, read_image, read_hot_spots
-from utils.sensor_constants import DATABOT_DATA_FILE, DATABOT_HOTSPOTS_DATA, DATABOT_IMAGE_PATH
+from utils.sensor_constants import DATABOT_DATA_FILE
 from utils.sidebar_utils import setup_input_selection_sidebar, get_display_fields_from_sensor_table, \
     get_save_fields_from_sensor_table
 
@@ -23,8 +23,10 @@ st.set_page_config(
     layout="wide",
 )
 
+
 def get_run_mode():
     return st.session_state.get('run_mode', default='stop')
+
 
 # ****************************************************
 #           CLICK HANDLERS
@@ -37,7 +39,6 @@ def continue_btn_on_click():
 def pause_btn_on_click():
     st.session_state.run_mode = 'pause'
 
-
 def stop_collecting_data_on_click():
     if 'pydatabot_process' in st.session_state:
         st.session_state.pydatabot_process.terminate()
@@ -47,6 +48,25 @@ def stop_collecting_data_on_click():
     st.session_state['data_refresh'] = False
     st.session_state.run_mode = 'stop'
 
+def _get_data_from_webserver_save_to_file(datafile_path:str,refresh_rate:int ):
+    print(f"start web server thread: {datafile_path}, {refresh_rate}")
+    while True:
+        try:
+            time.sleep(refresh_rate/1000)
+            data_record = requests.get(url="http://localhost:8321").json()
+            with datafile_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(data_record))
+                f.write("\n")
+
+        except requests.ConnectionError as conn_error:
+            # webserver must have gone away so we can exit this thread
+            break
+
+        except Exception as exc:
+            print(exc)
+            time.sleep(1)
+
+    print("**** EXIT webserver thread")
 
 def collect_data_on_click():
     if 'pydatabot_process' not in st.session_state:
@@ -63,8 +83,15 @@ def collect_data_on_click():
                 shell_flag = True
             else:
                 shell_flag = False
-            st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"],
+            # st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"],
+            #                                                       cwd=Path(".").absolute(), shell=shell_flag)
+            st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_run_webserver.py"],
                                                                   cwd=Path(".").absolute(), shell=shell_flag)
+
+            t = threading.Thread(target=_get_data_from_webserver_save_to_file, args=(DATABOT_DATA_FILE,st.session_state['databot_data_refresh_rate'] ), daemon=True)
+            t.start()
+
+            st.session_state.webserver_thread = t
     st.session_state['read_data_flag'] = True
     st.session_state.run_mode = 'start'
 
@@ -146,7 +173,7 @@ def _display_dataframe_data(df: pd.DataFrame):
 
                 st.divider()
                 st.write(field['friendly_name'])
-                c = alt.Chart(df_sensor_values).transform_fold(field['data_columns'], 
+                c = alt.Chart(df_sensor_values).transform_fold(field['data_columns'],
                                                                as_=['sensor_name', 'sensor_value']
                                                                ).mark_line().encode(x='time:T',
                                                                                     y='sensor_value:Q',
