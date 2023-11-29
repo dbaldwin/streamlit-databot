@@ -90,13 +90,13 @@ databot_sensors = {
         'display': False,
         'data_columns': ['ambient_light_in_lux']
     },
-    'rgbLight': {
-        'sensor_name': 'rgbLight',
-        'friendly_name': 'RGB Light',
-        'save': False,
-        'display': False,
-        'data_columns': ['r_light', 'g_light', 'b_light']
-    },
+    # 'rgbLight': {
+    #     'sensor_name': 'rgbLight',
+    #     'friendly_name': 'RGB Light',
+    #     'save': False,
+    #     'display': False,
+    #     'data_columns': ['r_light', 'g_light', 'b_light']
+    # },
     'UV': {
         'sensor_name': 'UV',
         'friendly_name': 'UltraViolet Light',
