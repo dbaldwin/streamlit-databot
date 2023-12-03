@@ -301,3 +301,5 @@ cython_debug/
 /data/test_data.txt
 /data/*.*
 
+/examples/databot_address.txt
+/examples/test_data.txt
