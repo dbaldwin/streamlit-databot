@@ -2,6 +2,10 @@
 
 ![overview](./docs/overview.gif)
 
+## Architecture
+
+![arch](./media/arch.png)
+
 ## Setup
 
 ```text
