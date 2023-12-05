@@ -1,18 +1,17 @@
-import dataclasses
+import json
 import pickle
 import platform
 import subprocess
 import threading
 import time
 from pathlib import Path
-import json
 
 import altair as alt
 import pandas as pd
 import requests
 import streamlit as st
-from databot.PyDatabot import DefaultDatabotConfig, DatabotConfig
-from hotspots.databot_image_map import find_image_map_entry
+from databot.PyDatabot import DatabotConfig
+
 from utils.sensor_constants import DATABOT_DATA_FILE
 from utils.sidebar_utils import setup_input_selection_sidebar, get_display_fields_from_sensor_table, \
     get_save_fields_from_sensor_table
@@ -24,7 +23,7 @@ st.set_page_config(
 )
 
 
-def get_run_mode():
+def get_run_mode(): # return stop/start/pause
     return st.session_state.get('run_mode', default='stop')
 
 
@@ -39,6 +38,7 @@ def continue_btn_on_click():
 def pause_btn_on_click():
     st.session_state.run_mode = 'pause'
 
+
 def stop_collecting_data_on_click():
     if 'pydatabot_process' in st.session_state:
         st.session_state.pydatabot_process.terminate()
@@ -48,11 +48,12 @@ def stop_collecting_data_on_click():
     st.session_state['data_refresh'] = False
     st.session_state.run_mode = 'stop'
 
-def _get_data_from_webserver_save_to_file(datafile_path:str,refresh_rate:int ):
+
+def _get_data_from_webserver_save_to_file(datafile_path: str, refresh_rate: int):
     print(f"start web server thread: {datafile_path}, {refresh_rate}")
     while True:
         try:
-            time.sleep(refresh_rate/1000)
+            time.sleep(refresh_rate / 1000)
             data_record = requests.get(url="http://localhost:8321").json()
             with datafile_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(data_record))
@@ -67,6 +68,7 @@ def _get_data_from_webserver_save_to_file(datafile_path:str,refresh_rate:int ):
             time.sleep(1)
 
     print("**** EXIT webserver thread")
+
 
 def collect_data_on_click():
     if 'pydatabot_process' not in st.session_state:
@@ -88,7 +90,8 @@ def collect_data_on_click():
             st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_run_webserver.py"],
                                                                   cwd=Path(".").absolute(), shell=shell_flag)
 
-            t = threading.Thread(target=_get_data_from_webserver_save_to_file, args=(DATABOT_DATA_FILE,st.session_state['databot_data_refresh_rate'] ), daemon=True)
+            t = threading.Thread(target=_get_data_from_webserver_save_to_file,
+                                 args=(DATABOT_DATA_FILE, st.session_state['databot_data_refresh_rate']), daemon=True)
             t.start()
 
             st.session_state.webserver_thread = t
@@ -148,6 +151,7 @@ def _display_dataframe_data(df: pd.DataFrame):
     st.dataframe(df, use_container_width=True)
     display_fields_records = get_display_fields_from_sensor_table()
     for field in display_fields_records:
+        print(field)
         data_columns = field['data_columns']
         if len(data_columns) == 1:
             # st.line_chart(df, x="time", y=data_column, use_container_width=True)
@@ -198,15 +202,6 @@ def draw_dashboard(placeholder_component, status_placeholder):
             df = read_databot_data_file(status_placeholder)
             if df is not None:
                 _display_dataframe_data(df)
-
-
-def highlight_selected_sensor(db_image):
-    fields = dataclasses.fields(DefaultDatabotConfig)
-    for field in fields:
-        checkbox_key = f"{field.name}_save_cb"
-        if checkbox_key in list(st.session_state.keys()):
-            if st.session_state[checkbox_key] == True:
-                key, value = find_image_map_entry(checkbox_key.split("_")[0])
 
 
 def main():
@@ -277,27 +272,6 @@ def main():
             pass
         finally:
             time.sleep(0.2)
-
-    # with tab2:
-    #     st.write("Sensor Map")
-    #     hotspots_df = read_hot_spots(DATABOT_HOTSPOTS_DATA)
-    #     st.dataframe(hotspots_df)
-    #     st.write(hotspots_df.shape)
-    #     the_image = read_image(DATABOT_IMAGE_PATH)
-    #     # st.image(image=the_image)
-    #
-    #     # highlight_selected_sensor(the_image)
-    #
-    #     value = streamlit_image_coordinates(source=the_image, height=650, width=650, key="db_image")
-    #     #
-    #     st.write(value)
-    #     if value is not None:
-    #         normal_x = value['x'] / the_image.shape[1]
-    #         normal_y = value['y'] / the_image.shape[0]
-    #         st.write(f"({normal_x},{normal_y})")
-    #         box = find_box(normal_x, normal_y, hotspots_df)
-    #         if box is not None:
-    #             print(f"Index: {box[0]}")
 
 
 @st.cache_data
