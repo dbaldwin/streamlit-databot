@@ -5,6 +5,11 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.WARNING)
+
 
 import altair as alt
 import pandas as pd
@@ -50,7 +55,7 @@ def stop_collecting_data_on_click():
 
 
 def _get_data_from_webserver_save_to_file(datafile_path: str, refresh_rate: int):
-    print(f"start web server thread: {datafile_path}, {refresh_rate}")
+    logging.debug(f"start web server thread: {datafile_path}, {refresh_rate}")
     while True:
         try:
             time.sleep(refresh_rate / 1000)
@@ -64,10 +69,10 @@ def _get_data_from_webserver_save_to_file(datafile_path: str, refresh_rate: int)
             break
 
         except Exception as exc:
-            print(exc)
+            logging.debug(exc)
             time.sleep(1)
 
-    print("**** EXIT webserver thread")
+    logging.debug("**** EXIT webserver thread")
 
 
 def collect_data_on_click():
@@ -151,7 +156,7 @@ def _display_dataframe_data(df: pd.DataFrame):
     st.dataframe(df, use_container_width=True)
     display_fields_records = get_display_fields_from_sensor_table()
     for field in display_fields_records:
-        print(field)
+        logging.debug(field)
         data_columns = field['data_columns']
         if len(data_columns) == 1:
             # st.line_chart(df, x="time", y=data_column, use_container_width=True)
