@@ -45,6 +45,21 @@ def pause_btn_on_click():
 
 
 def stop_collecting_data_on_click():
+    """
+    Stop collecting data on click.
+
+    This method is responsible for stopping the collection of data. It terminates the pydatabot_process, if it exists in the st.session_state, and deletes it from the session state. It also
+    * sets the read_data_flag, data_refresh, and run_mode in the session state to their respective default values.
+
+    Parameters:
+        None
+
+    Returns:
+        None
+
+    Example usage:
+        stop_collecting_data_on_click()
+    """
     if 'pydatabot_process' in st.session_state:
         st.session_state.pydatabot_process.terminate()
         del st.session_state['pydatabot_process']
@@ -55,6 +70,39 @@ def stop_collecting_data_on_click():
 
 
 def _get_data_from_webserver_save_to_file(datafile_path: str, refresh_rate: int):
+    """
+
+    This method `_get_data_from_webserver_save_to_file` is responsible for continuously fetching data from a web server and saving it to a file.
+
+    Parameters:
+    - `datafile_path` (str): The path to the file where the data will be saved.
+    - `refresh_rate` (int): The refresh rate in milliseconds, indicating how often to fetch new data from the web server.
+
+    Returns:
+    - This method does not have a return value.
+
+    Here is an example usage:
+
+    ```python
+    datafile_path = "/path/to/datafile.txt"
+    refresh_rate = 5000
+
+    _get_data_from_webserver_save_to_file(datafile_path, refresh_rate)
+    ```
+
+    The method starts a web server thread that runs indefinitely. Within the thread, it repeatedly performs the following steps:
+    1. Sleeps for the specified `refresh_rate` in milliseconds.
+    2. Makes a GET request to the web server at `http://localhost:8321`.
+    3. Retrieves the response as JSON data.
+    4. Appends the JSON data to the file specified by `data_path_file`, followed by a newline character.
+
+    If a `requests.ConnectionError` occurs, it means that the web server has gone away, so the thread can exit gracefully.
+
+    If any other exception occurs during the execution of the method, it will be logged and the thread will sleep for 1 second before continuing.
+
+    Once the web server thread is exited, a debug log indicating the exit will be generated.
+
+    """
     logging.debug(f"start web server thread: {datafile_path}, {refresh_rate}")
     while True:
         try:
@@ -76,6 +124,32 @@ def _get_data_from_webserver_save_to_file(datafile_path: str, refresh_rate: int)
 
 
 def collect_data_on_click():
+    """
+    Collects data when the user clicks a button.
+
+    This method collects data only if certain conditions are met. It checks if the 'pydatabot_process' key is not present in the session state of the Streamlit app. If the 'run_mode_flag
+    *' key is present in the session state and its value is 'Launch Databot script', it proceeds to collect the data.
+
+    First, it sets the 'datafile_path' key in the session state to the value of DATABOT_DATA_FILE.
+
+    Next, it checks if the data file exists and removes it if it does.
+
+    Then, it creates a DatabotConfig object using the create_databot_config() function.
+
+    After that, it saves the DatabotConfig object to a file named 'streamlit_databot_config.pkl'.
+
+    Depending on the operating system, it sets the 'shell_flag' variable to either True or False.
+
+    Next, it starts a subprocess that runs the 'pydatabot_run_webserver.py' script using the 'python' command. The subprocess is started in the current directory and with the shell flag
+    * depending on the operating system.
+
+    A separate thread is started to continuously get data from the web server and save it to the data file. The thread runs the _get_data_from_webserver_save_to_file() function with the
+    * arguments DATABOT_DATA_FILE and the value of 'databot_data_refresh_rate' from the session state. The thread is started as a daemon thread to ensure it exits when the main thread exits
+    *.
+
+    Finally, it sets the 'read_data_flag' key in the session state to True and sets the 'run_mode' key to 'start'.
+
+    """
     if 'pydatabot_process' not in st.session_state:
         if 'run_mode_flag' in st.session_state and st.session_state['run_mode_flag'] == 'Launch Databot script':
             st.session_state['datafile_path'] = DATABOT_DATA_FILE
