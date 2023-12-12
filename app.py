@@ -1,11 +1,11 @@
 import json
+import logging
 import pickle
 import platform
 import subprocess
 import threading
 import time
 from pathlib import Path
-import logging
 
 # Set up logging
 logging.basicConfig(level=logging.WARNING)
@@ -64,9 +64,9 @@ def stop_collecting_data_on_click():
         try:
             st.session_state.pydatabot_process.terminate()
             time.sleep(0.2)
-            st.session_state.pydatabot_process.kill()
-        except:
+        except Exception as e:
             st.error("Could not terminate data collection process")
+            logging.exception("Could not terminate data collector", exc_info=e)
         finally:
             del st.session_state['pydatabot_process']
 
