@@ -2,3 +2,4 @@ databot-py
 streamlit
 pandas
 requests
+bottle
