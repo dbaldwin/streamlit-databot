@@ -61,7 +61,14 @@ def stop_collecting_data_on_click():
         stop_collecting_data_on_click()
     """
     if 'pydatabot_process' in st.session_state:
-        st.session_state.pydatabot_process.terminate()
+        try:
+            st.session_state.pydatabot_process.terminate()
+        except:
+            try:
+                st.session_state.pydatabot_process.kill()
+            except:
+                st.error("Could not terminate data collection process")
+
         del st.session_state['pydatabot_process']
 
     st.session_state['read_data_flag'] = False
