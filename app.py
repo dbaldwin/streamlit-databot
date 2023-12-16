@@ -27,6 +27,13 @@ st.set_page_config(
     layout="wide",
 )
 
+def get_sensor_values_to_display():
+    sensor_select_df = st.session_state.updated_sensor_df
+    display_chart_df = sensor_select_df.query("display == True").sort_values(by="friendly_name")
+    json_records = json.loads(display_chart_df.to_json(orient='records'))
+
+    return json_records
+
 
 def get_run_mode(): # return stop/start/pause
     return st.session_state.get('run_mode', default='stop')
@@ -166,14 +173,11 @@ def collect_data_on_click():
             with open("streamlit_databot_config.pkl", "wb") as f:
                 pickle.dump(databot_config, f)
             # windows needs shell=True, macos shell=False
-            if "windows" in platform.system().lower():
-                shell_flag = True
-            else:
-                shell_flag = False
-            # st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"],
-            #                                                       cwd=Path(".").absolute(), shell=shell_flag)
-            st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_run_webserver.py"],
+            shell_flag = st.session_state.is_windows
+            st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_save_data_to_file.py"],
                                                                   cwd=Path(".").absolute(), shell=shell_flag)
+            # st.session_state.pydatabot_process = subprocess.Popen(["python", "pydatabot_run_webserver.py"],
+            #                                                       cwd=Path(".").absolute(), shell=shell_flag)
 
             t = threading.Thread(target=_get_data_from_webserver_save_to_file,
                                  args=(DATABOT_DATA_FILE, st.session_state['databot_data_refresh_rate']), daemon=True)
@@ -201,6 +205,16 @@ def read_databot_data_file(status_placeholder) -> pd.DataFrame | None:
         status_placeholder.success(f"Reading from datafile: {datafile_path}")
 
         df = pd.read_json(path_or_buf=datafile_path, lines=True)
+        # only pull out the columns for the selected sensors.
+        columns_to_drop = st.session_state.updated_sensor_df.query("display == False")['data_columns'].to_list()
+        columns_to_drop = [item for sublist in columns_to_drop for item in sublist]
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+        if get_run_mode() == 'start':
+            if df.shape[1] == 2:
+                # means all we have are the time and the timestamp columns which means the
+                # script to save values is not saving the values selected in the checkbox list
+                st.error(f"The script to save databot values does not save the sensors selected.  Make sure you have selected all of the sensors in the save data script that you might want to see in the Dashboard")
+
         df.sort_values(by=['time'], ascending=False, inplace=True)
         if st.session_state['number_of_samples_to_display'] > 0:
             df = df.head(st.session_state['number_of_samples_to_display'])
@@ -290,20 +304,6 @@ def draw_dashboard(placeholder_component, status_placeholder):
 
 
 def main():
-    col_t1, col_t2, col_t3 = st.columns(3)
-    with col_t1:
-        st.write(' ')
-    with col_t2:
-        col_temp1, col_i1, col_i2, col_temp2 = st.columns([0.1, 0.45, 0.35, 0.1])
-        col_temp1.write(' ')
-        with col_i1:
-            st.image(str(Path("./media/DB_logo_400px.jpg").absolute()), use_column_width=True)
-        with col_i2:
-            st.image(str(Path("./media/databot.png").absolute()), use_column_width=True)
-        col_temp2.write(' ')
-    with col_t3:
-        st.write(' ')
-
     st.header("DroneBlocks databot2.0™ Dashboard")
     setup_input_selection_sidebar()
     # tab1, tab2 = st.tabs(["Dashboard", "Sensor Map"])
@@ -364,6 +364,14 @@ def init_app_once():
     st.session_state['data_refresh'] = False
     st.session_state.run_mode = 'stop'  # 'start', 'stop', 'pause'
     st.session_state.last_df = None
+    if 'datafile_path' not in st.session_state:
+        st.session_state['datafile_path'] = DATABOT_DATA_FILE
+
+    if "windows" in platform.system().lower():
+        st.session_state.is_windows = True
+    else:
+        st.session_state.is_windows = False
+
     return 1
 
 

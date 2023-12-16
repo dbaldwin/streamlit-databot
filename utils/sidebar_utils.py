@@ -1,8 +1,10 @@
-import streamlit as st
-from .sensor_constants import databot_sensors
-import pandas as pd
 import json
 from typing import List
+
+import pandas as pd
+import streamlit as st
+
+from .sensor_constants import databot_sensors
 
 
 def get_display_fields_from_sensor_table() -> List[dict]:
@@ -65,14 +67,22 @@ def setup_input_selection_sidebar():
     with st.sidebar:
         st.title("Data Collection Config")
         st.divider()
-        run_mode = st.radio(label='How would you like to read databot2.0™ data',
-                            options=['Launch Databot script', 'Read from a Databot file'],
-                            captions=['Run a script that will collect data in real time. \nThis will launch a databot process to read sensor values and save them to a file.', 'Read data from an existing file, which can be updated by a separate PyDatabot application.'],
-                            help='Launching a script will run a python script in a separate process that will write data to a file and display that data.  Reading from a file will not launch a process, but instead just read from a file that may be static, or being populated by a different script reading from the databot.',
-                            key="run_mode_flag")
+        if st.session_state.is_windows:
+            run_mode = st.radio(label='How would you like to read databot2.0™ data',
+                                options=['Read from a Databot file'],
+                                captions=['Read data from an existing file, which can be updated by a separate PyDatabot application.'],
+                                help='Reading from a file will not launch a process, but instead just read from a file that may be static, or being populated by a different script reading from the databot.',
+                                key="run_mode_flag")
+        else:
+            run_mode = st.radio(label='How would you like to read databot2.0™ data',
+                                options=['Launch Databot script', 'Read from a Databot file'],
+                                captions=['Run a script that will collect data in real time. \nThis will launch a databot process to read sensor values and save them to a file.', 'Read data from an existing file, which can be updated by a separate PyDatabot application.'],
+                                help='Launching a script will run a python script in a separate process that will write data to a file and display that data.  Reading from a file will not launch a process, but instead just read from a file that may be static, or being populated by a different script reading from the databot.',
+                                key="run_mode_flag")
+
         st.divider()
 
-        if run_mode == 'Launch Databot script':
+        if run_mode == 'Launch Databot script' and not st.session_state.is_windows:
             tab1, tab2 = st.tabs(['Databot Sensors', 'Collection Config'])
             display_databot_sensors_from_df(tab1, include_save_to_file=False)
 

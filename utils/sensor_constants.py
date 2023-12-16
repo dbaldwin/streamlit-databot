@@ -139,13 +139,13 @@ databot_sensors = {
     #     'display': False,
     #     'data_columns': ['distance']
     # },
-    'noise': {
-        'sensor_name': 'noise',
-        'friendly_name': 'Noise',
-        'save': False,
-        'display': False,
-        'data_columns': ['noise_sound']
-    },
+    # 'noise': {
+    #     'sensor_name': 'noise',
+    #     'friendly_name': 'Noise',
+    #     'save': False,
+    #     'display': False,
+    #     'data_columns': ['noise_sound']
+    # },
     'Ldist': {
         'sensor_name': 'Ldist',
         'friendly_name': 'Laser Distance',
@@ -154,12 +154,12 @@ databot_sensors = {
         'data_columns': ['distance']
 
     },
-    'gesture': {
-        'sensor_name': 'gesture',
-        'friendly_name': 'Gesture',
-        'save': False,
-        'display': False,
-        'data_columns': ['gesture']
-    },
+    # 'gesture': {
+    #     'sensor_name': 'gesture',
+    #     'friendly_name': 'Gesture',
+    #     'save': False,
+    #     'display': False,
+    #     'data_columns': ['gesture']
+    # },
 
 }
