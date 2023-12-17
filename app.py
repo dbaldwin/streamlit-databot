@@ -370,7 +370,11 @@ def init_app_once():
     if "windows" in platform.system().lower():
         st.session_state.is_windows = True
     else:
-        st.session_state.is_windows = False
+        # for consistent usage between windows and macos, always assume that the windows version
+        # should be used.  the windows version will not provide the ability to launch the process to run
+        # the python script.  However - if you are a macos user - you can change the True value to False
+        # and unlock some additional capability.
+        st.session_state.is_windows = True
 
     return 1
 

@@ -58,7 +58,7 @@ def display_databot_sensors_from_df(tab_container, include_save_to_file: bool = 
                        hide_index=True,
                        column_order=column_order,
                        use_container_width=True,
-                       height=740
+                       height=600
         )
         st.session_state.updated_sensor_df = updated_sensor_df
 

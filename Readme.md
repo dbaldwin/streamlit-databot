@@ -4,7 +4,7 @@
 
 ## Architecture
 
-![arch](./media/arch.png)
+![arch](./media/file_arch.png)
 
 ## Setup
 
