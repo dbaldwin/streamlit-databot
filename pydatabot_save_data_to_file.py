@@ -23,7 +23,6 @@ def main():
     c.Sdist = True
     c.address = PyDatabot.get_databot_address()
 
-    c.address = PyDatabot.get_databot_address()
     print(f"Save data to file: {DATABOT_DATA_FILE}")
     time.sleep(2)
     db = PyDatabotSaveToFileDataCollector(c, file_name=DATABOT_DATA_FILE)
